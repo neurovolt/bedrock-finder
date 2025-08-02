@@ -2,95 +2,100 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Bedrock Chunk Finder</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bedrock Finder</title>
   <style>
-    body { text-align: center; font-family: sans-serif; background: #111; color: #eee; }
-    canvas { border: 2px solid #ccc; margin-top: 10px; background: #fff; }
-    button, .grid-button {
-      margin: 10px; padding: 10px 20px;
-      background: green; color: white; border: none;
-      font-size: 16px; border-radius: 6px; cursor: pointer;
-    }
-    .grid-button.selected { background: darkgreen; }
+    body { text-align: center; font-family: Arial, sans-serif; background: #222; color: white; }
+    canvas { background: white; cursor: crosshair; margin: 10px; }
+    button { margin: 5px; padding: 8px 12px; }
   </style>
 </head>
 <body>
-  <h1>Bedrock Chunk Finder</h1>
+  <h1>Minecraft Bedrock Finder</h1>
 
   <div>
-    <span>Grid Size:</span>
-    <button class="grid-button selected" onclick="setGrid(8)">8×8</button>
-    <button class="grid-button" onclick="setGrid(16)">16×16</button>
+    <button onclick="setGrid(8)">8×8</button>
+    <button onclick="setGrid(16)">16×16</button>
   </div>
 
-  <canvas id="gridCanvas" width="320" height="320"></canvas>
-  <br>
+  <canvas id="grid" width="320" height="320"></canvas><br>
   <button onclick="findChunk()">Find Chunk</button>
   <button onclick="resetGrid()">Reset Grid</button>
+
   <p id="result"></p>
 
   <script>
-    const canvas = document.getElementById("gridCanvas");
+    const canvas = document.getElementById("grid");
     const ctx = canvas.getContext("2d");
     let gridSize = 8;
-    let grid = [];
+    let cellSize = canvas.width / gridSize;
+    let grid = Array(gridSize).fill().map(() => Array(gridSize).fill(0));
 
-    function resetGrid() {
-      grid = Array.from({ length: gridSize }, () => Array(gridSize).fill(0));
-      drawGrid();
-      document.getElementById("result").textContent = "";
-    }
-
-    function drawGrid() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const cellSize = canvas.width / gridSize;
-
-      for (let y = 0; y < gridSize; y++) {
-        for (let x = 0; x < gridSize; x++) {
-          ctx.fillStyle = grid[y][x] ? "#333" : "#fff";
-          ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
-          ctx.strokeStyle = "#000";
-          ctx.strokeRect(x * cellSize, y * cellSize, cellSize, cellSize);
-        }
-      }
-    }
-
-    canvas.addEventListener("click", function (e) {
-      const rect = canvas.getBoundingClientRect();
-      const x = Math.floor((e.clientX - rect.left) / (canvas.width / gridSize));
-      const y = Math.floor((e.clientY - rect.top) / (canvas.height / gridSize));
-      grid[y][x] = 1 - grid[y][x];
-      drawGrid();
+    canvas.addEventListener("click", (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = Math.floor((e.clientX - rect.left) / cellSize);
+        const y = Math.floor((e.clientY - rect.top) / cellSize);
+        grid[y][x] = grid[y][x] ? 0 : 1;
+        drawGrid();
     });
 
     function setGrid(size) {
-      gridSize = size;
-      document.querySelectorAll(".grid-button").forEach(btn => btn.classList.remove("selected"));
-      document.querySelector(`.grid-button:nth-child(${size === 8 ? 2 : 3})`).classList.add("selected");
-      resetGrid();
+        gridSize = size;
+        cellSize = canvas.width / gridSize;
+        grid = Array(gridSize).fill().map(() => Array(gridSize).fill(0));
+        drawGrid();
+    }
+
+    function drawGrid() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Fill selected cells
+        for (let y = 0; y < gridSize; y++) {
+            for (let x = 0; x < gridSize; x++) {
+                if (grid[y][x]) {
+                    ctx.fillStyle = "black";
+                    ctx.fillRect(x * cellSize, y * cellSize, cellSize, cellSize);
+                }
+            }
+        }
+
+        // Draw grid lines
+        ctx.strokeStyle = "#000";
+        ctx.lineWidth = 1;
+        for (let x = 0; x <= canvas.width; x += cellSize) {
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.lineTo(x, canvas.height);
+            ctx.stroke();
+        }
+        for (let y = 0; y <= canvas.height; y += cellSize) {
+            ctx.beginPath();
+            ctx.moveTo(0, y);
+            ctx.lineTo(canvas.width, y);
+            ctx.stroke();
+        }
     }
 
     async function findChunk() {
-      const flat = grid.flat();
-      const binary = flat.join("");
-      const response = await fetch("https://bedrock-backend.neurovolt.replit.dev/find", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pattern: binary, size: gridSize })
-      });
+        document.getElementById("result").innerText = "Processing...";
 
-      const data = await response.json();
-      const result = document.getElementById("result");
+        const response = await fetch("https://a4928d61-2ef5-416f-b8c4-3731b02139a5-00-zb96jjurmy1j.pike.replit.dev/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ pattern: grid })
+        });
 
-      if (data.match) {
-        result.textContent = `✅ Found at Chunk: ${data.x}, ${data.z}`;
-      } else {
-        result.textContent = `❌ No match found`;
-      }
+        const data = await response.json();
+        document.getElementById("result").innerText =
+            `Chunk Coordinates: X=${data.chunk_x}, Z=${data.chunk_z}`;
     }
 
-    // Init
-    resetGrid();
+    function resetGrid() {
+        grid = Array(gridSize).fill().map(() => Array(gridSize).fill(0));
+        drawGrid();
+    }
+
+    drawGrid();
   </script>
 </body>
 </html>
